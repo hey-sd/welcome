@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Node.js / npm
+  - package-ecosystem: "npm"
+    directory: "/" # Root-level package.json
+    schedule:
+      interval: "weekly"
+
+  # Python / pip
+  - package-ecosystem: "pip"
+    directory: "/" # If using requirements.txt or pyproject.toml
+    schedule:
+      interval: "weekly"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/" # Always root
+    schedule:
+      interval: "weekly"

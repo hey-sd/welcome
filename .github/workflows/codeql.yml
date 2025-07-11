@@ -1,4 +1,4 @@
-name: "CodeQL Advanced"
+name: "CodeQL Full Analysis"
 
 on:
   push:
@@ -6,17 +6,18 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '38 16 * * 5'  # Every Friday at 16:38 UTC
+    - cron: '0 6 * * 1'  # Weekly Monday scan
+
+permissions:
+  security-events: write
+  actions: read
+  contents: read
+  packages: read
 
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    permissions:
-      security-events: write
-      packages: read
-      actions: read
-      contents: read
+    name: CodeQL Analysis – ${{ matrix.language }}
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
@@ -24,27 +25,76 @@ jobs:
         include:
           - language: javascript-typescript
             build-mode: autobuild
+            os: ubuntu-latest
+
           - language: python
+            build-mode: manual
+            os: ubuntu-latest
+
+          - language: go
             build-mode: autobuild
-          # Add more languages if needed (go, ruby, java-kotlin, etc.)
+            os: ubuntu-latest
+
+          - language: ruby
+            build-mode: manual
+            os: ubuntu-latest
+
+          - language: csharp
+            build-mode: manual
+            os: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
+      - name: ⚙️ Setup Node.js
+        if: matrix.language == 'javascript-typescript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 🐍 Setup Python
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: 🔧 Setup Ruby
+        if: matrix.language == 'ruby'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
+      - name: 🔧 Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: 🧠 Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
-      - if: matrix.build-mode == 'manual'
-        name: Manual Build Placeholder
+      - name: 🧱 Manual Build (if required)
+        if: matrix.build-mode == 'manual'
         run: |
-          echo "Replace this with your manual build commands"
-          exit 1
+          echo "Running manual build steps for ${{ matrix.language }}..."
 
-      - name: Perform CodeQL Analysis
+          if [[ "${{ matrix.language }}" == "python" ]]; then
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt || true
+          elif [[ "${{ matrix.language }}" == "ruby" ]]; then
+            bundle install || true
+          elif [[ "${{ matrix.language }}" == "csharp" ]]; then
+            dotnet restore
+            dotnet build --no-restore
+          else
+            echo "No manual build steps defined for ${{ matrix.language }}"
+          fi
+
+      - name: 🧪 Run CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
